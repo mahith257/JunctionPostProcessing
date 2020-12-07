@@ -19,28 +19,38 @@ def get_lines(lines_in):
     return [l[0] for l in lines_in]
 
 
-# function for concatenating the sliced images
-def concat_tile(im_list_2d):
-    return cv2.vconcat([cv2.hconcat(im_list_h) for im_list_h in im_list_2d])
+def subtract_arrays(outer, inner):
+    final = []
+    if len(inner) == 0:
+        final = outer
+    else:
+        for i in range(len(outer)):
+            for j in range(len(inner)):
+                if np.array_equal(outer[i], inner[j]):
+                    break
+                else:
+                    if j == len(inner) - 1:
+                        final.append(outer[i])
+
+    return final
 
 
 kernel_1 = np.ones((5, 5), np.uint8)
-images = []
 # for appending the filenames of binary mask images(without extensions) in a list
 file_names_bm = []
-for img in glob.glob('binary_mask/*.jpg'):
+for img in glob.glob('specific_instance_images_new/*.png'):
     m = Path(img).stem
     file_names_bm.append(m)
 
 # eroding the image and writing the eroded images into a folder
 for n in range(len(file_names_bm)):
-    image = cv2.imread('binary_mask/'+file_names_bm[n]+'.jpg')
+    image = cv2.imread('specific_instance_images_new/'+file_names_bm[n]+'.png')
     erode_image = cv2.erode(image, kernel_1, iterations=1)
-    cv2.imwrite('erode_images/'+file_names_bm[n]+'.jpg', erode_image)
+    cv2.imwrite('specific_erode_instance_images_new/'+file_names_bm[n]+'.jpg', erode_image)
 
 # skeletonization of images and writing them into a folder
 for n in range(len(file_names_bm)):
-    img = cv2.imread('binary_mask/'+file_names_bm[n]+'.jpg')
+    img = cv2.imread('specific_instance_images_new/'+file_names_bm[n]+'.png')
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     ret, img = cv2.threshold(img, 50, 255, 0)
     size = np.size(img)
@@ -57,21 +67,21 @@ for n in range(len(file_names_bm)):
         img = eroded.copy()
         if cv2.countNonZero(img) == 0:
             break
-    cv2.imwrite('skeleton_images/'+file_names_bm[n]+'.jpg', skel)
+    cv2.imwrite('specific_skeleton_instance_images_new/'+file_names_bm[n]+'.jpg', skel)
 
 for n in range(len(file_names_bm)):
     # for making a directory with filenames of binary mask images if directory already exists it shows an error
-    # os.mkdir('skeleton_instance_sliced/'+file_names_bm[n])
+    # os.mkdir('specific_instance_sliced_tiles_new/'+file_names_bm[n])
     # slicing the binary mask images into 49 slices(7*7) using image_slicer
-    tiles = image_slicer.slice('skeleton_images/'+file_names_bm[n]+'.jpg', 49, save=False)
+    tiles = image_slicer.slice('specific_instance_images_new/'+file_names_bm[n]+'.png', 64, save=False)
     # saving the sliced images of binary mask in the respective folders
-    image_slicer.save_tiles(tiles, directory="skeleton_slice/"+file_names_bm[n], prefix='slice', format="jpeg")
+    image_slicer.save_tiles(tiles, directory="specific_instance_sliced_tiles_new/"+file_names_bm[n], prefix='slice', format="jpeg")
     rest_lines_all = []
     # appending the read sliced images in an empty list
     sliced_images = []
     # appending the filenames of the sliced images of a corresponding binary mask image in an empty list
     file_names = []
-    for img in glob.glob('skeleton_slice/'+file_names_bm[n]+'/*.jpg'):
+    for img in glob.glob('specific_instance_sliced_tiles_new/'+file_names_bm[n]+'/*.jpg'):
         z = Path(img).stem
         file_names.append(z)
         y = cv2.imread(img)
@@ -86,7 +96,7 @@ for n in range(len(file_names_bm)):
         parallel_lines_drawn = []
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         edges = cv2.Canny(gray, 50, 150)
-        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=20, minLineLength=20, maxLineGap=10)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=10, minLineLength=10, maxLineGap=60)
         if np.any(lines):
             if len(get_lines(lines)) == 1:
                 x1, y1, x2, y2 = get_lines(lines)[0]
@@ -97,19 +107,20 @@ for n in range(len(file_names_bm)):
                 x3, y3, x4, y4 = get_lines(lines)[1]
                 all_lines.append(np.array(get_lines(lines)[0]))
                 all_lines.append(np.array(get_lines(lines)[1]))
-                diff = abs(((y2 - y1) / (x2 - x1)) - ((y4 - y3) / (x4 - x3)))
-                if diff <= 0.1:
-                    x5 = round((x1 + x3) / 2)
-                    y5 = round((y1 + y3) / 2)
-                    x6 = round((x2 + x4) / 2)
-                    y6 = round((y2 + y4) / 2)
-                    # cv2.line(img, (x5, y5), (x6, y6), (255, 0, 0), 2)
-                    parallel_lines_drawn.append([x5, y5, x6, y6])
-                    parallel_lines.append(np.array(get_lines(lines)[0]))
-                    parallel_lines.append(np.array(get_lines(lines)[1]))
-                # else:
-                #     cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                #     cv2.line(img, (x3, y3), (x4, y4), (0, 0, 255), 2)
+                if (x3 != x1) and (y3 != y1) and (x4 != x2) and (y4 != y2):
+                    diff = abs(((y2 - y1) / (x2 - x1)) - ((y4 - y3) / (x4 - x3)))
+                    if diff <= 0.1:
+                        x5 = round((x1 + x3) / 2)
+                        y5 = round((y1 + y3) / 2)
+                        x6 = round((x2 + x4) / 2)
+                        y6 = round((y2 + y4) / 2)
+                        # cv2.line(img, (x5, y5), (x6, y6), (255, 0, 0), 2)
+                        parallel_lines_drawn.append([x5, y5, x6, y6])
+                        parallel_lines.append(np.array(get_lines(lines)[0]))
+                        parallel_lines.append(np.array(get_lines(lines)[1]))
+                    # else:
+                    #     cv2.line(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    #     cv2.line(img, (x3, y3), (x4, y4), (0, 0, 255), 2)
             else:
                 for line in get_lines(lines):
                     x1, y1, x2, y2 = line
@@ -145,17 +156,7 @@ for n in range(len(file_names_bm)):
             parallel_lines_drawn = np.unique(parallel_lines_drawn, axis=0)
             parallel_lines = np.unique(parallel_lines, axis=0)
 
-            # if there are no parallel lines
-            if len(parallel_lines) == 0:
-                rest_lines = all_lines
-            else:
-                for i in range(len(all_lines)):
-                    for j in range(len(parallel_lines)):
-                        if np.array_equal(all_lines[i], parallel_lines[j]):
-                            break
-                        else:
-                            if j == len(parallel_lines) - 1:
-                                rest_lines.append(all_lines[i])
+            rest_lines = subtract_arrays(all_lines, parallel_lines)
             # rest_lines = np.unique(rest_lines, axis=0)
             # rest_lines_all = np.unique(rest_lines_all, axis=0)
             # print(rest_lines)
@@ -165,92 +166,211 @@ for n in range(len(file_names_bm)):
                 rest_lines.append(parallel_lines_drawn[j])
 
             # converting the parameters of points with respect to the concatenated image
-            for k in range(7):
-                if z == (7 * k):
+            for k in range(8):
+                if z == (8 * k):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
                         x1 = x1
-                        y1 = y1 + (36 * k)
+                        y1 = y1 + (img.shape[0] * k)
                         x2 = x2
-                        y2 = y2 + (36 * k)
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
-                elif z == ((7 * k) + 1):
+                elif z == ((8 * k) + 1):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
-                        x1 = x1 + 73
-                        y1 = y1 + (36 * k)
-                        x2 = x2 + 73
-                        y2 = y2 + (36 * k)
+                        x1 = x1 + img.shape[1]
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + img.shape[1]
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
-                elif z == ((7 * k) + 2):
+                elif z == ((8 * k) + 2):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
-                        x1 = x1 + (73 * 2)
-                        y1 = y1 + (36 * k)
-                        x2 = x2 + (73 * 2)
-                        y2 = y2 + (36 * k)
+                        x1 = x1 + (img.shape[1] * 2)
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + (img.shape[1] * 2)
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
-                elif z == ((7 * k) + 3):
+                elif z == ((8 * k) + 3):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
-                        x1 = x1 + (73 * 3)
-                        y1 = y1 + (36 * k)
-                        x2 = x2 + (73 * 3)
-                        y2 = y2 + (36 * k)
+                        x1 = x1 + (img.shape[1] * 3)
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + (img.shape[1] * 3)
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
-                elif z == ((7 * k) + 4):
+                elif z == ((8 * k) + 4):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
-                        x1 = x1 + (73 * 4)
-                        y1 = y1 + (36 * k)
-                        x2 = x2 + (73 * 4)
-                        y2 = y2 + (36 * k)
+                        x1 = x1 + (img.shape[1] * 4)
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + (img.shape[1] * 4)
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
-                elif z == ((7 * k) + 5):
+                elif z == ((8 * k) + 5):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
-                        x1 = x1 + (73 * 5)
-                        y1 = y1 + (36 * k)
-                        x2 = x2 + (73 * 5)
-                        y2 = y2 + (36 * k)
+                        x1 = x1 + (img.shape[1] * 5)
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + (img.shape[1] * 5)
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
-                elif z == ((7 * k) + 6):
+                elif z == ((8 * k) + 6):
                     for m in range(len(rest_lines)):
                         x1, y1, x2, y2 = rest_lines[m]
-                        x1 = x1 + (73 * 6)
-                        y1 = y1 + (36 * k)
-                        x2 = x2 + (73 * 6)
-                        y2 = y2 + (36 * k)
+                        x1 = x1 + (img.shape[1] * 6)
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + (img.shape[1] * 6)
+                        y2 = y2 + (img.shape[0] * k)
+                        rest_lines[m] = [x1, y1, x2, y2]
+                        rest_lines_all.append(rest_lines[m])
+                elif z == ((8 * k) + 7):
+                    for m in range(len(rest_lines)):
+                        x1, y1, x2, y2 = rest_lines[m]
+                        x1 = x1 + (img.shape[1] * 7)
+                        y1 = y1 + (img.shape[0] * k)
+                        x2 = x2 + (img.shape[1] * 7)
+                        y2 = y2 + (img.shape[0] * k)
                         rest_lines[m] = [x1, y1, x2, y2]
                         rest_lines_all.append(rest_lines[m])
 
-    # writing the sliced images with detected lines into the corresponding binary mask or instance mask image folders
+    # writing the sliced images with detected lines (if drawn) into the corresponding binary mask or instance mask image folders
     for k in range(len(sliced_images)):
-        path = 'skeleton_slice/'+file_names_bm[n]+'/'+file_names[k] + '.jpg'
+        path = 'specific_instance_sliced_tiles_new/'+file_names_bm[n]+'/'+file_names[k] + '.jpg'
         # cv_img[k] = cv2.cvtColor(cv_img[k], cv2.COLOR_BGR2RGB)
         cv2.imwrite(path, sliced_images[k])
 
     # concatenating the slices
-    im_tile = concat_tile([[sliced_images[0], sliced_images[1], sliced_images[2], sliced_images[3], sliced_images[4], sliced_images[5], sliced_images[6]],
-                           [sliced_images[7], sliced_images[8], sliced_images[9], sliced_images[10], sliced_images[11], sliced_images[12], sliced_images[13]],
-                           [sliced_images[14], sliced_images[15], sliced_images[16], sliced_images[17], sliced_images[18], sliced_images[19], sliced_images[20]],
-                           [sliced_images[21], sliced_images[22], sliced_images[23], sliced_images[24], sliced_images[25], sliced_images[26], sliced_images[27]],
-                           [sliced_images[28], sliced_images[29], sliced_images[30], sliced_images[31], sliced_images[32], sliced_images[33], sliced_images[34]],
-                           [sliced_images[35], sliced_images[36], sliced_images[37], sliced_images[38], sliced_images[39], sliced_images[40], sliced_images[41]],
-                           [sliced_images[42], sliced_images[43], sliced_images[44], sliced_images[45], sliced_images[46], sliced_images[47], sliced_images[48]]])
+    im_tile = image_slicer.join(tiles)
+    im_tile = cv2.cvtColor(np.array(im_tile), cv2.COLOR_RGB2BGR)
 
     fit_lines = []
     final_lines_all = []
-    for s in range(len(rest_lines_all)):
-        x7, y7, x8, y8 = rest_lines_all[s]
-        for h in range(len(rest_lines_all)):
-            x9, y9, x10, y10 = rest_lines_all[h]
+    fit_lines_drawn = []
+
+    rest_lines_all = np.unique(rest_lines_all, axis=0)
+
+    all_points = []
+    for line in rest_lines_all:
+        x1, y1, x2, y2 = line
+        all_points.append([x1, y1])
+        all_points.append([x2, y2])
+        if dist(x1, y1, x2, y2) > 10:
+            i = 1
+            while i > 0:
+                s = ((2 * (y1 - y2) * (x2 * y1 - y2 * x1)) + (x1 ** 2 + y1 ** 2 - x2 ** 2 - y2 ** 2 - (10 * i) ** 2 + (
+                            (dist(x1, y1, x2, y2) - (10 * i)) ** 2)) * (x1 - x2)) / (
+                                2 * ((x2 - x1) ** 2 + (y2 - y1) ** 2))
+                t = ((2 * (x2 - x1) * (x2 * y1 - y2 * x1)) + (x1 ** 2 + y1 ** 2 - x2 ** 2 - y2 ** 2 - (10 * i) ** 2 + (
+                            (dist(x1, y1, x2, y2) - (10 * i)) ** 2)) * (y1 - y2)) / (
+                                2 * ((x2 - x1) ** 2 + (y2 - y1) ** 2))
+                all_points.append([s, t])
+                i = i + 1
+                if dist(s, t, x2, y2) < 10:
+                    i = 0
+
+    all_points = np.unique(all_points, axis=0)
+    poly_fit_lines = []
+
+    for z in range(len(sliced_images)):
+        specific_points = []
+        img = sliced_images[z]
+        for k in range(8):
+            if z == (8 * k):
+                for point in all_points:
+                    x, y = point
+                    if (x >= 0) and (x <= img.shape[1]):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 1):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1]) and (x <= img.shape[1] * 2):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 2):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1] * 2) and (x <= img.shape[1] * 3):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 3):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1] * 3) and (x <= img.shape[1] * 4):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 4):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1] * 4) and (x <= img.shape[1] * 5):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 5):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1] * 5) and (x <= img.shape[1] * 6):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 6):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1] * 6) and (x <= img.shape[1] * 7):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+            elif z == ((8 * k) + 7):
+                for point in all_points:
+                    x, y = point
+                    if (x > img.shape[1] * 7) and (x <= img.shape[1] * 8):
+                        if (y > img.shape[0] * k) and (y <= img.shape[0] * (k + 1)):
+                            specific_points.append([x, y])
+
+        if np.any(specific_points):
+            if len(specific_points) > 1:
+                data = {'x': [], 'y': []}
+                for point in specific_points:
+                    x1, y1 = point
+                    data['x'].append(x1)
+                    data['y'].append(y1)
+                data_frame = pd.DataFrame(data=data)
+                x = data_frame.x
+                y = data_frame.y
+                model = np.polyfit(x, y, 1)
+                m = model[0]
+                c = model[1]
+                max_num = 0
+                x8 = 0
+                y8 = 0
+                x9 = 0
+                y9 = 0
+
+                for p in specific_points:
+                    x1, y1 = p
+                    for j in specific_points:
+                        x2, y2 = j
+                        if dist(x1, y1, x2, y2) >= max_num:
+                            max_num = dist(x1, y1, x2, y2)
+                            x8 = x1
+                            y8 = y1
+                            x9 = x2
+                            y9 = y2
+                h1 = round((((-m) * (m * x8 - y8 + c)) / (m ** 2 + 1)) + x8)
+                k1 = round(((m * x8 - y8 + c) / (m ** 2 + 1)) + y8)
+                h2 = round((((-m) * (m * x9 - y9 + c)) / (m ** 2 + 1)) + x9)
+                k2 = round(((m * x9 - y9 + c) / (m ** 2 + 1)) + y9)
+                # cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                poly_fit_lines.append([h1, k1, h2, k2])
+
+    for s in range(len(poly_fit_lines)):
+        x7, y7, x8, y8 = poly_fit_lines[s]
+        for h in range(len(poly_fit_lines)):
+            x9, y9, x10, y10 = poly_fit_lines[h]
             if (x7 != x9) and (y7 != y9) and (x8 != x10) and (y8 != y10):
                 if (x8 - x7) != 0 and (x10 - x9) != 0:
                     diff = abs(((y8 - y7) / (x8 - x7)) - ((y10 - y9) / (x10 - x9)))
@@ -272,7 +392,8 @@ for n in range(len(file_names_bm)):
                                 k1 = round(((m * x7 - y7 + c) / (m ** 2 + 1)) + y7)
                                 h2 = round((((-m) * (m * x9 - y9 + c)) / (m ** 2 + 1)) + x9)
                                 k2 = round(((m * x9 - y9 + c) / (m ** 2 + 1)) + y9)
-                                cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                # cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                fit_lines_drawn.append([h1, k1, h2, k2])
                         elif (max(dist(x7, y7, x9, y9), dist(x7, y7, x10, y10), dist(x8, y8, x9, y9),
                                   dist(x8, y8, x10, y10))) == dist(x7, y7, x10, y10):
                             if (min(dist(x7, y7, x9, y9), dist(x7, y7, x10, y10), dist(x8, y8, x9, y9),
@@ -290,7 +411,8 @@ for n in range(len(file_names_bm)):
                                 k1 = round(((m * x7 - y7 + c) / (m ** 2 + 1)) + y7)
                                 h2 = round((((-m) * (m * x10 - y10 + c)) / (m ** 2 + 1)) + x10)
                                 k2 = round(((m * x10 - y10 + c) / (m ** 2 + 1)) + y10)
-                                cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                # cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                fit_lines_drawn.append([h1, k1, h2, k2])
                         elif (max(dist(x7, y7, x9, y9), dist(x7, y7, x10, y10), dist(x8, y8, x9, y9),
                                   dist(x8, y8, x10, y10))) == dist(x8, y8, x9, y9):
                             if (min(dist(x7, y7, x9, y9), dist(x7, y7, x10, y10), dist(x8, y8, x9, y9),
@@ -308,7 +430,8 @@ for n in range(len(file_names_bm)):
                                 k1 = round(((m * x8 - y8 + c) / (m ** 2 + 1)) + y8)
                                 h2 = round((((-m) * (m * x9 - y9 + c)) / (m ** 2 + 1)) + x9)
                                 k2 = round(((m * x9 - y9 + c) / (m ** 2 + 1)) + y9)
-                                cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                # cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                fit_lines_drawn.append([h1, k1, h2, k2])
                         elif (max(dist(x7, y7, x9, y9), dist(x7, y7, x10, y10), dist(x8, y8, x9, y9),
                                   dist(x8, y8, x10, y10))) == dist(x8, y8, x10, y10):
                             if (min(dist(x7, y7, x9, y9), dist(x7, y7, x10, y10), dist(x8, y8, x9, y9),
@@ -326,28 +449,26 @@ for n in range(len(file_names_bm)):
                                 k1 = round(((m * x8 - y8 + c) / (m ** 2 + 1)) + y8)
                                 h2 = round((((-m) * (m * x10 - y10 + c)) / (m ** 2 + 1)) + x10)
                                 k2 = round(((m * x10 - y10 + c) / (m ** 2 + 1)) + y10)
-                                cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                # cv2.line(im_tile, (h1, k1), (h2, k2), (0, 255, 255), 2)
+                                fit_lines_drawn.append([h1, k1, h2, k2])
 
     fit_lines = np.unique(fit_lines, axis=0)
-    rest_lines_all = np.unique(rest_lines_all, axis=0)
-    for i in range(len(rest_lines_all)):
-        for j in range(len(fit_lines)):
-            if np.array_equal(rest_lines_all[i], fit_lines[j]):
-                break
-            else:
-                if j == len(fit_lines) - 1:
-                    final_lines_all.append(rest_lines_all[i])
-    # print(len(rest_lines_all))
-    # print(len(fit_lines))
-    # print(len(final_lines_all))
+    fit_lines_drawn = np.unique(fit_lines_drawn, axis=0)
+
+    final_lines_all = subtract_arrays(poly_fit_lines, fit_lines)
+
+    for l in fit_lines_drawn:
+        x1, y1, x2, y2 = l
+        final_lines_all.append([x1, y1, x2, y2])
+
     for s in range(len(final_lines_all)):
         x1, y1, x2, y2 = final_lines_all[s]
         cv2.line(im_tile, (x1, y1), (x2, y2), (255, 0, 0), 2)
 
     # writing the concatenated slices into a folder
-    cv2.imwrite('concatenated_skeleton_images/'+file_names_bm[n]+'.jpg', im_tile)
+    cv2.imwrite('specific_concatenated_instance_images_new/'+file_names_bm[n]+'.jpg', im_tile)
     # path to the source images
-    path_bg = 'source_image/' + file_names_bm[n] + '.jpg'
+    path_bg = 'specific_source_image/' + file_names_bm[n] + '.jpg'
     bg = cv2.imread(path_bg)
     background = Image.open(path_bg)
     # resizing the concatenated image to the size of the source image
@@ -355,7 +476,7 @@ for n in range(len(file_names_bm)):
     # superimposing the concatenated image on the source image
     result = cv2.addWeighted(bg, 0.8, fg_resize, 0.5, 0.8)
     # writing the superimposed images into the folder
-    cv2.imwrite('visualized_skeleton_images/'+file_names_bm[n]+'.jpg', result)
+    cv2.imwrite('specific_visualized_instance_images_new/'+file_names_bm[n]+'.jpg', result)
 
 k = cv2.waitKey(0)
 cv2.destroyAllWindows()
