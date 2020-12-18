@@ -9,19 +9,19 @@ Steps:
 
 3. Apply HoughLinesP method in each and every block to detect the lines
 
-4. If the any two lines in the same slice are within 10% slope then create a median of the two lines(removing the original two lines) --- R1
+4. If any two lines in the same slice are within 10% slope then create a median of the two lines(removing the original two lines) --- R1
 
-5. Assemble the slices back
+5. Take the lines detected till now including the median lines and get the points on each and every at 10px or such interval
 
-6. Take the lines detected till now including the median lines and get the points on each and every at 10px or such interval
+6. Associate the points with respect to their corresponding slice
 
-7. Associate the points with respect to their corresponding slice
+7. Apply polfit method in each and every slice
 
-8. Apply polfit method in each and every slice
+Steps 5, 6, 7 --- R2
 
-Steps 6, 7, 8 --- R2
+8. Assemble the slices back
 
-9. Draw the fitted line using polyfit method in the assembled image(of step 5)
+9. Draw the fitted line using polyfit method in the assembled image
 
 10. Write the assembled images after step 9 into the folder
 
