@@ -330,15 +330,17 @@ source_image = config.SOURCE_IMAGE_PATH
 concatenated_images = config.CONCATENATED_IMAGES_PATH
 slicing_images = config.SLICING_IMAGES_PATH
 sliced_tiles = config.SLICED_TILES_PATH
+erode_images = config.ERODE_PATH
+skeleton_images = config.SKELETON_PATH
 file_names_bm = get_file_names(instance_mask)
 
-erosion(instance_mask, 'instance_mask_new/', 'erode_instance_images_new/')
-skeleton(instance_mask, 'instance_mask_new/', 'skeleton_instance_images_new/')
+erosion(instance_mask, slicing_images, erode_images)
+skeleton(instance_mask, slicing_images, skeleton_images)
 for n in range(len(file_names_bm)):
     # for making a directory with filenames of binary mask images if directory already exists it shows an error
-    # make_directory('erode_instance_sliced_tiles_new/'+file_names_bm[n])
+    make_directory('instance_sliced_tiles_new/'+file_names_bm[n])
     # slicing and saving the binary mask images into 49 slices(7*7) using image_slicer
-    tiles = slicing(slicing_images +file_names_bm[n]+'.jpg', sliced_tiles+file_names_bm[n], 64)
+    tiles = slicing(slicing_images +file_names_bm[n]+'.png', sliced_tiles+file_names_bm[n], 64)
     rest_lines_all = []
     # appending the filenames of the sliced images of a corresponding binary mask image in an empty list
     file_names = get_file_names(sliced_tiles + file_names_bm[n] + '/*.jpg')
@@ -373,7 +375,7 @@ for n in range(len(file_names_bm)):
                     if accuracy > 0.5:
                         poly_fit_lines = polyfit_in_slices(all_points, model)
                     else:
-                        # make_directory(sliced_tiles + file_names_bm[n] + '/' + file_names[z])
+                        make_directory(sliced_tiles + file_names_bm[n] + '/' + file_names[z])
                         tiles_2 = slicing(sliced_tiles + file_names_bm[n] + '/' + file_names[z] + '.jpg',
                                           sliced_tiles + file_names_bm[n] + '/' + file_names[z], 4)
                         sliced_images_2 = read_images(sliced_tiles + file_names_bm[n] + '/' + file_names[z] + '/*.jpg')
